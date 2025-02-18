@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Rustwofait",
+  "version": "1.0.0",
+  "identifier": "xyz.20070107.2fa",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:2007",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Rustwofait",
+        "width": 800,
+        "height": 600,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/180x180.png",
+      "icons/512x512.png",
+      "icons/2048x2048.png",
+      "icons/icon.ico"
+    ]
+  }
+}
