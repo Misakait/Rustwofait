@@ -2,29 +2,61 @@
   <div class="card-container h-full">
 
     <!-- 遍历数据列表，渲染卡片 -->
-    <div v-for="(item, index) in store.dataList" :key="index" class="card flex flex-row">
-      <div class="basis-1/4">
+<!--    <div v-for="(item, index) in store.dataList" :key="item.id" class="card flex flex-row">-->
+    <div v-for="item in store.dataList" :key="item.id" class="card flex flex-row">
+      <div class="basis-1/5">
         <div class="Capital">
           {{ item.company[0] }}
         </div>
       </div>
-      <div class="basis-3/4">
-        <div>{{ item.company }}&nbsp;&nbsp;{{ item.username }}&nbsp;&nbsp;{{ item.custom_name }}</div>
+      <div class="basis-3/5">
+        <div>{{ item.company }}&nbsp;&nbsp;{{ item.username }}&nbsp;&nbsp;{{ item.custom_name }}{{ item.id }}</div>
         <div class="text-2xl font-semibold code">{{ formattedTotpCode(item.totp_code)}}</div>
         <div></div>
+      </div>
+      <div class="basis-1/5">
+        <button
+            @click="toggleDropdown(item.id)"
+            class="h-[60px] w-[60px] text-2xl flex items-center justify-center font-bold"
+            :ref="(el) => setButtonRef(el as HTMLElement | null, item.id)"
+        >
+          ⋮
+        </button>
+        <!-- 下拉框 -->
+        <div
+            v-if="dropdownVisible[item.id]"
+            class="absolute top-8 right-2 bg-white border border-gray-300 rounded shadow-md z-10"
+            :ref="(el) => setDropdownRef(el as HTMLElement | null, item.id)"
+        >
+          <ul>
+            <li
+                @click="handleDelete(item.id)"
+                class="hover:bg-gray-100 cursor-pointer"
+            >
+              删除
+            </li>
+<!--            <li-->
+<!--                @click="handleEdit(index)"-->
+<!--                class="hover:bg-gray-100 cursor-pointer"-->
+<!--            >-->
+<!--              更改-->
+<!--            </li>-->
+          </ul>
+        </div>
       </div>
     </div>
   </div>
 </template>
 <script setup lang="ts">
-import { onMounted} from 'vue';
+import {ref, onMounted,onUnmounted} from 'vue';
 import {invoke} from "@tauri-apps/api/core";
 import {useTotoStore} from "../stores/Toto.ts";
 import { TwoFactorAuthInfoType } from "../impl/TwoFactorAuthInfoType.ts";
 const store = useTotoStore();
-// 定义数据列表，每个数据项包含两个文本信息
-
-
+// 下拉框的显示状态
+const dropdownVisible = ref<boolean[]>([]);
+const buttonRefs = ref<Array<HTMLElement | null>>([]);
+const dropdownRefs = ref<Array<HTMLElement | null>>([]);
 // 计算属性函数，用于格式化 totp_code
 const formattedTotpCode = (code: number) => {
   const codeStr = code.toString();
@@ -38,8 +70,58 @@ const formattedTotpCode = (code: number) => {
 onMounted(async () => {
   store.dataList= await invoke<Array<TwoFactorAuthInfoType>>('generate_totp');
   store.remainingTime = store.dataList[0].remaining_time;
+  dropdownVisible.value = new Array(store.dataList.length).fill(false);
+  // 点击文档时，隐藏所有下拉框
+  document.addEventListener('click', handleDocumentClick);
 })
+onUnmounted(() => {
+  // 移除文档点击事件监听，防止内存泄漏
+  document.removeEventListener('click', handleDocumentClick);
+});
 
+// 点击文档时关闭下拉框的处理函数
+const handleDocumentClick = (event: MouseEvent) => {
+  dropdownVisible.value.forEach((visible, index) => {
+    if (visible) {
+      const dropdown = dropdownRefs.value[index];
+      const button = buttonRefs.value[index];
+      if (!dropdown?.contains(event.target as Node) && !button?.contains(event.target as Node)) {
+        dropdownVisible.value[index] = false;
+      }
+    }
+  });
+};
+const setButtonRef = (el: HTMLElement | null, index: number) => {
+  buttonRefs.value[index] = el;
+};
+
+const setDropdownRef = (el: HTMLElement | null, index: number) => {
+  dropdownRefs.value[index] = el;
+};
+// 切换下拉框的显示状态
+const toggleDropdown = (index: number) => {
+  dropdownVisible.value[index] =!dropdownVisible.value[index];
+};
+
+// 删除处理函数
+const handleDelete = async (index: number) => {
+  // 这里添加删除逻辑，例如调用后端接口或更新 store 中的数据
+  // store.dataList.splice(index, 1);
+  let result = await invoke<string>('delete_2fa_data', {
+    id: index,
+  });
+  alert(result)
+  dropdownVisible.value[index] = false;
+  store.dataList= await invoke<Array<TwoFactorAuthInfoType>>('generate_totp');
+  store.remainingTime = store.dataList[0].remaining_time;
+};
+
+// 更改处理函数
+// const handleEdit = (index: number) => {
+//   // 这里添加更改逻辑，例如弹出编辑框
+//   dropdownVisible.value[index] = false;
+//   console.log(`编辑第 ${index} 条数据`);
+// };
 </script>
 
 <style scoped>
@@ -95,5 +177,8 @@ onMounted(async () => {
 }
 .code{
   color: #0452D6;
+}
+li{
+  padding: 10px;
 }
 </style>

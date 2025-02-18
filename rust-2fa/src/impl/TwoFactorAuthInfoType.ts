@@ -4,4 +4,5 @@ export type TwoFactorAuthInfoType = {
     totp_code: number;
     username: string;
     remaining_time: number;
+    id : number;
 };

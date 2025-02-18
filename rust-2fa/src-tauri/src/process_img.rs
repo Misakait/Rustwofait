@@ -12,7 +12,8 @@ pub struct TwoFactorAuthInfo {
     username: String,
     company: String,
     totp_code: u32,
-    remaining_time : u8
+    remaining_time : u8,
+    id: i32,
 }
 fn init_db() -> Result<Connection> {
     let conn = Connection::open("2fa_data.db")?;
@@ -58,7 +59,7 @@ pub fn save_2fa_data(name: Option<String>, otpauth: &str) -> String {
     }else{
         "".to_string()
     };
-    let username = path_parts_iter.next().unwrap_or("Username is not exist");
+    let username = path_parts_iter.next().unwrap_or("");
 
     let period = url.query_pairs()
         .find(|(k, _)| k == "period")
@@ -96,7 +97,7 @@ pub fn save_2fa_data(name: Option<String>, otpauth: &str) -> String {
 pub fn generate_totp() -> Result<Vec<TwoFactorAuthInfo>, String> {
     let conn = init_db().map_err(|e| e.to_string())?; // 转换init_db的错误
     let mut stmt = conn
-        .prepare("SELECT custom_name, username, company, period, secret, algorithm FROM two_factor_auth")
+        .prepare("SELECT custom_name, username, company, period, secret, algorithm, id FROM two_factor_auth")
         .map_err(|e| e.to_string())?; // 转换prepare的错误
     let now = SystemTime::now();
     let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
@@ -111,6 +112,7 @@ pub fn generate_totp() -> Result<Vec<TwoFactorAuthInfo>, String> {
             let period: u64 = row.get(3)?;
             let secret: String = row.get(4)?;
             let algorithm_str: String = row.get(5)?;
+            let id : i32 = row.get(6)?;
             // 计算剩余有效时间
             let elapsed_seconds = timestamp_seconds % period as u64 ;
             let remaining_time = (period as u64 - elapsed_seconds) as u8;
@@ -150,7 +152,8 @@ pub fn generate_totp() -> Result<Vec<TwoFactorAuthInfo>, String> {
                 username,
                 company,
                 totp_code,
-                remaining_time
+                remaining_time,
+                id
             })
         })
         .map_err(|e| e.to_string())?; // 转换query_map的错误
@@ -179,7 +182,20 @@ pub fn parse_2fa_data(otpauth: &str)->(String,String) {
     } else {
         "Company is not exist"
     };
-    let username = path_parts_iter.next().unwrap_or("Username is not exist");
+    let username = path_parts_iter.next().unwrap_or("");
 
     (company.to_string(),username.to_string())
+}
+#[command]
+pub fn delete_2fa_data(id: i32) -> Result<String, String> {
+    let conn = init_db().map_err(|e| e.to_string())?;
+    let result = conn.execute(
+        "DELETE FROM two_factor_auth WHERE id =?1",
+        [id],
+    );
+    if let Ok(_) = result {
+        Ok("删除成功".to_string())
+    } else {
+        Err("删除失败".to_string())
+    }
 }
